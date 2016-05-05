@@ -71,12 +71,19 @@ class FileData:
             'sha256sum': self.sha256sum,
         }
 
+    def exists(self):
+        return os.path.exists(self.filepath)
+
     def calc_hash(self, force=False):
         """If hash is calced and force is False, return what we have
         """
 
         if self._sha256sum is not None and not force:
             return self._sha256sum
+
+        # Something may have removed this file
+        if not self.exists():
+            return None
 
         with open(self.filepath, 'rb') as f:
             self._sha256sum = hashlib.sha256(f.read()).hexdigest()
@@ -121,12 +128,16 @@ def file_datas_for(path, refresh=True):
     return files
 
 
+def sort_filedata(f):
+    return f.sha256sum or ''
+
+
 def check_duplicates(files):
     dups = []
 
     for size, filelist in files.items():
         if len(filelist) > 1:
-            for hash, filelist in itertools.groupby(sorted(filelist, key=lambda f: f.sha256sum), lambda f: f.sha256sum):
+            for hash, filelist in itertools.groupby(sorted(filelist, key=sort_filedata), sort_filedata):
                 filelist = list(filelist)
                 if len(filelist) > 1:
                     dups.append(filelist)
@@ -173,7 +184,7 @@ def cleanup(preserve_dir, dups):
         else:
             to_preserve = to_preserve[0]
 
-        to_kill = [d for d in duplist if not d.path.startswith(preserve_dir)]
+        to_kill = [d for d in duplist if not d.path.startswith(preserve_dir) and d.exists()]
 
         hashdict = {
             to_preserve.sha256sum: {
