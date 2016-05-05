@@ -1,10 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # vim: fileencoding=utf-8
-
-from copykill2 import copykill2
 
 import os
 import sys
+
+# Horrendous hack, never do this anywhere
+file_dir = os.path.dirname(__file__)
+module_path = os.path.realpath(os.path.join(file_dir, '..'))
+
+if module_path not in sys.path:
+    sys.path.insert(0, module_path)
+
+from copykill2 import copykill2
 
 
 def main(args):
