@@ -98,20 +98,25 @@ def file_datas_for(path, refresh=True):
     cache_path = os.path.join(path, CACHE_FILE_NAME)
 
     if os.path.exists(cache_path) and not refresh:
+        print('Loading cache')
         with open(cache_path, 'rb') as cache_file:
             try:
-                return pickle.load(cache_file)
-            except EOFError:
-                pass
+                files = pickle.load(cache_file)
+                print('Loaded cache {}'.format(cache_file))
+                return files
+            except EOFError as e:
+                print('Caught and ignored {}'.format(e))
 
     path = os.path.realpath(path)
 
     files = {}
 
+    i = 0
     for dirpath, dirnames, filenames in os.walk(path):
         for name in filenames:
             file_path = os.path.join(dirpath, name)
             if os.path.isfile(file_path):
+                i += 1
                 stat = os.stat(file_path)
 
                 filedata = FileData(path=dirpath, name=name, stat=stat)
@@ -119,12 +124,15 @@ def file_datas_for(path, refresh=True):
                 # files[filedata.sha256sum] = filedata
                 files.setdefault(filedata.size, []).append(filedata)
 
+                if i % 100 == 0:
+                    print(end=".", flush=True)
     try:
         with open(cache_path, 'wb') as cache_file:
             pickle.dump(files, cache_file)
     except PermissionError:
         print('Creating cache failed, whatever')
 
+    print('Got {} file sizes'.format(len(files.keys())))
     return files
 
 
@@ -137,10 +145,15 @@ def check_duplicates(files):
 
     for size, filelist in files.items():
         if len(filelist) > 1:
-            for hash, filelist in itertools.groupby(sorted(filelist, key=sort_filedata), sort_filedata):
-                filelist = list(filelist)
-                if len(filelist) > 1:
-                    dups.append(filelist)
+            print('Looking at {} files'.format(len(filelist)), flush=True)
+            for hash, dup_filelist in itertools.groupby(sorted(filelist, key=sort_filedata), sort_filedata):
+                print(hash, end=' ', flush=True)
+                dup_filelist = list(dup_filelist)
+                if len(dup_filelist) > 1:
+                    dups.append(dup_filelist)
+                    print('\t{} duplicates'.format(len(dup_filelist)), flush=True)
+                else:
+                    print('\tonly one', flush=True)
 
     return dups
 
@@ -177,7 +190,9 @@ def cleanup(preserve_dir, dups):
             report_name = report_name_raw.format(i)
             report_path = os.path.join(preserve_dir, report_name)
 
-    for duplist in dups:
+    len_dups = len(dups)
+    print('Going through {} duplicates'.format(len(dups)))
+    for i, duplist in enumerate(dups):
         to_preserve = [d for d in duplist if not d.path.startswith(preserve_dir)]
         if len(to_preserve) > 1:
             to_preserve = sorted(to_preserve, key=lambda f: f.mtime)[0]
@@ -185,6 +200,8 @@ def cleanup(preserve_dir, dups):
             to_preserve = to_preserve[0]
 
         to_kill = [d for d in duplist if not d.path.startswith(preserve_dir) and d.exists()]
+
+        print('[{}/{}] {} {} to kill'.format(i + 1, len_dups, to_preserve.sha256sum, len(duplist)))
 
         hashdict = {
             to_preserve.sha256sum: {
