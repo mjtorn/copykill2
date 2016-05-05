@@ -112,8 +112,11 @@ def file_datas_for(path, refresh=True):
                 # files[filedata.sha256sum] = filedata
                 files.setdefault(filedata.size, []).append(filedata)
 
-    with open(cache_path, 'wb') as cache_file:
-        pickle.dump(files, cache_file)
+    try:
+        with open(cache_path, 'wb') as cache_file:
+            pickle.dump(files, cache_file)
+    except PermissionError:
+        print('Creating cache failed, whatever')
 
     return files
 
