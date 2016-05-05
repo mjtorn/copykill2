@@ -150,7 +150,9 @@ def cleanup(preserve_dir, dups):
             #    'killed': []
             #    'preserved': ''
             # }
-        }
+        },
+        'preserved_count': 0,
+        'killed_count': 0,
     }
 
     report_name = 'copykill2.report.{}'.format(datetime.datetime.now().date().isoformat())
@@ -181,6 +183,8 @@ def cleanup(preserve_dir, dups):
         }
 
         report['by_hash'].update(hashdict)
+        report['preserved_count'] += 1
+        report['killed_count'] += len(to_kill)
 
     with open(report_path, 'wb') as report_file:
         report_json = json.dumps(report, indent=4)
