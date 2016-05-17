@@ -221,6 +221,7 @@ def cleanup(preserve_dir, dups):
         report['preserved_count'] += 1
         report['killed_count'] += len(to_kill)
 
+    print('Writing report to {}'.format(report_path))
     with open(report_path, 'wb') as report_file:
         report_json = json.dumps(report, indent=4)
         report_file.write(bytes(report_json, encoding='utf-8'))
