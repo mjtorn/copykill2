@@ -86,7 +86,14 @@ class FileData:
             return None
 
         with open(self.filepath, 'rb') as f:
-            self._sha256sum = hashlib.sha256(f.read()).hexdigest()
+            hash_ = hashlib.sha256()
+            while True:
+                chunk = f.read(128 * 1024 * 1024)
+                if not chunk:
+                    break
+                hash_.update(chunk)
+
+        self._sha256sum = hash_.hexdigest()
 
         return self._sha256sum
 
