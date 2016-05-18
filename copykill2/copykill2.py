@@ -98,7 +98,7 @@ class FileData:
         return self._sha256sum
 
 
-def file_datas_for(path, refresh=True):
+def file_datas_for(path, refresh=False):
     """Create a cache to make development faster
     """
 

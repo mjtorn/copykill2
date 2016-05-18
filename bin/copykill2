@@ -24,15 +24,17 @@ def main(args):
         return 1
 
     files = {}
-    preserve_dir = os.path.realpath(args[0])
-    dir_tree = os.path.realpath(args[1])
+    preserve_dir = os.path.realpath(args.pop(0))
+    dir_tree = os.path.realpath(args.pop(0))
+
+    refresh_cache = '--refresh-cache' in args
 
     if not preserve_dir.startswith(dir_tree):
         print('Preservation directory must be under the directory tree '
                 'because I do not care about implementing anything else now')
         return 1
 
-    files = copykill2.file_datas_for(dir_tree)
+    files = copykill2.file_datas_for(dir_tree, refresh=refresh_cache)
     dups = copykill2.check_duplicates(files)
     copykill2.print_duplicates(dups)
 
