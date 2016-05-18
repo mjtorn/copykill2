@@ -1,5 +1,7 @@
 # vim: fileencoding=utf-8
 
+import concurrent.futures
+
 import datetime
 import hashlib
 import itertools
@@ -10,6 +12,8 @@ import os
 
 
 CACHE_FILE_NAME = 'copykill2.cache'
+CPU_COUNT = os.sysconf('SC_NPROCESSORS_ONLN')
+MAX_WORKERS = CPU_COUNT - 2
 
 
 class FileData:
@@ -85,6 +89,7 @@ class FileData:
         if not self.exists():
             return None
 
+        # print('[{}] Calculating hash for {}'.format(os.getpid(), self.filepath), flush=True)
         with open(self.filepath, 'rb') as f:
             hash_ = hashlib.sha256()
             while True:
@@ -94,6 +99,7 @@ class FileData:
                 hash_.update(chunk)
 
         self._sha256sum = hash_.hexdigest()
+        # print('[{}] \t Done {}'.format(os.getpid(), self.filepath), flush=True)
 
         return self._sha256sum
 
@@ -147,21 +153,34 @@ def sort_filedata(f):
     return f.sha256sum or ''
 
 
+def check_duplicate_filelist(filelist):
+    print('[{}] Looking at {} files'.format(os.getpid(), len(filelist)), flush=True)
+    for hash, dup_filelist in itertools.groupby(sorted(filelist, key=sort_filedata), sort_filedata):
+        print('[{}] {}'.format(os.getpid(), hash), end=' ', flush=True)
+        dup_filelist = list(dup_filelist)
+        if len(dup_filelist) > 1:
+            print('\t{} duplicates'.format(len(dup_filelist)), flush=True)
+        else:
+            print('\tonly one', flush=True)
+
+    return dup_filelist
+
+
 def check_duplicates(files):
     dups = []
+    futures = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for size, filelist in files.items():
+            if len(filelist) > 1:
+                future = executor.submit(
+                    check_duplicate_filelist,
+                    filelist,
+                )
+                future.add_done_callback(lambda fut: dups.append(fut.result()))
+                futures.append(future)
 
-    for size, filelist in files.items():
-        if len(filelist) > 1:
-            print('Looking at {} files'.format(len(filelist)), flush=True)
-            for hash, dup_filelist in itertools.groupby(sorted(filelist, key=sort_filedata), sort_filedata):
-                print(hash, end=' ', flush=True)
-                dup_filelist = list(dup_filelist)
-                if len(dup_filelist) > 1:
-                    dups.append(dup_filelist)
-                    print('\t{} duplicates'.format(len(dup_filelist)), flush=True)
-                else:
-                    print('\tonly one', flush=True)
-
+        print('[{}] Waiting on {} futures'.format(os.getpid(), len(futures)))
+        print(concurrent.futures.wait(futures))
     return dups
 
 
